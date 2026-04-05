@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sudoku Game</title>
+<link rel="stylesheet" href="style.css">
+
+<style>
+.controls { display: flex; gap: 15px; }
+
+button {
+  padding: 12px 25px;
+  font-size: 16px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.hint-btn { background: #4caf50; color: white; }
+.check-btn { background: #2196f3; color: white; }
+.new-btn { background: #f44336; color: white; }
+
+.counter { font-size: 18px; }
+</style>
+</head>
+
+<body>
+
+<div class="grid-container">
+  <div class="title">Sudoku</div>
+
+  <div class="counter">Solved: <span id="counter">0</span></div>
+  <div class="counter">Hints: <span id="hints">0</span>/7</div>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="controls">
+    <button class="hint-btn" onclick="giveHint()">Hint</button>
+    <button class="check-btn" onclick="checkSolution()">Check</button>
+    <button class="new-btn" onclick="newGame()">New Game</button>
+  </div>
+</div>
+
+<div class="music" onclick="toggleMusic()">Music: Off</div>
+
+<audio id="bgMusic" loop>
+  <source src="music.mp3" type="audio/mpeg">
+</audio>
+
+<script>
+
+// ---------- COUNTERS ----------
+let solvedCount = localStorage.getItem("sudokuSolved") || 0;
+let hintsUsed = 0;
+
+document.getElementById("counter").innerText = solvedCount;
+document.getElementById("hints").innerText = hintsUsed;
+
+// ---------- MUSIC ----------
+let isPlaying = false;
+const music = document.getElementById("bgMusic");
+const musicBtn = document.querySelector(".music");
+
+// autoplay after first click
+document.addEventListener("click", () => {
+  if (!isPlaying) {
+    music.play();
+    musicBtn.innerText = "Music: On";
+    isPlaying = true;
+  }
+}, { once: true });
+
+function toggleMusic() {
+  if (isPlaying) {
+    music.pause();
+    musicBtn.innerText = "Music: Off";
+  } else {
+    music.play();
+    musicBtn.innerText = "Music: On";
+  }
+  isPlaying = !isPlaying;
+}
+
+// ---------- HELPERS ----------
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
+function isValid(board, row, col, num) {
+  for (let i = 0; i < 9; i++) {
+    if (board[row][i] === num) return false;
+    if (board[i][col] === num) return false;
+
+    const boxRow = 3 * Math.floor(row / 3) + Math.floor(i / 3);
+    const boxCol = 3 * Math.floor(col / 3) + (i % 3);
+
+    if (board[boxRow][boxCol] === num) return false;
+  }
+  return true;
+}
+
+// ---------- SOLVER ----------
+function solve(board) {
+  for (let row = 0; row < 9; row++) {
+    for (let col = 0; col < 9; col++) {
+
+      if (board[row][col] === 0) {
+        let nums = [1,2,3,4,5,6,7,8,9];
+        shuffle(nums);
+
+        for (let num of nums) {
+          if (isValid(board, row, col, num)) {
+            board[row][col] = num;
+
+            if (solve(board)) return true;
+
+            board[row][col] = 0;
+          }
+        }
+
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+// ---------- GENERATOR ----------
+function generateSudoku() {
+  let board = Array.from({ length: 9 }, () => Array(9).fill(0));
+
+  solve(board);
+
+  let solution = board.flat();
+  let puzzle = [...solution];
+
+  let cellsToRemove = 45;
+
+  while (cellsToRemove > 0) {
+    let index = Math.floor(Math.random() * 81);
+    if (puzzle[index] !== 0) {
+      puzzle[index] = 0;
+      cellsToRemove--;
+    }
+  }
+
+  return { puzzle, solution };
+}
+
+const { puzzle, solution } = generateSudoku();
+
+// ---------- GRID ----------
+const grid = document.getElementById("grid");
+let cells = [];
+
+for (let i = 0; i < 81; i++) {
+  const input = document.createElement("input");
+  input.type = "text";
+  input.maxLength = 1;
+  input.classList.add("cell");
+
+  if (puzzle[i] !== 0) {
+    input.value = puzzle[i];
+    input.classList.add("fixed");
+  }
+
+  input.addEventListener("input", () => {
+    if (input.classList.contains("fixed")) {
+      input.value = puzzle[i];
+      return;
+    }
+    input.value = input.value.replace(/[^1-9]/g, "");
+  });
+
+  input.addEventListener("keydown", (e) => {
+    const index = i;
+
+    if (input.classList.contains("fixed") &&
+        !["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Tab"].includes(e.key)) {
+      e.preventDefault();
+    }
+
+    if (e.key === "ArrowRight" && index % 9 !== 8) cells[index + 1].focus();
+    if (e.key === "ArrowLeft" && index % 9 !== 0) cells[index - 1].focus();
+    if (e.key === "ArrowDown" && index + 9 < 81) cells[index + 9].focus();
+    if (e.key === "ArrowUp" && index - 9 >= 0) cells[index - 9].focus();
+
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const moves = [index+1, index+9, index-1, index-9];
+
+      for (let move of moves) {
+        if (
+          move >= 0 &&
+          move < 81 &&
+          !cells[move].classList.contains("fixed") &&
+          cells[move].value === ""
+        ) {
+          cells[move].focus();
+          break;
+        }
+      }
+    }
+  });
+
+  grid.appendChild(input);
+  cells.push(input);
+}
+
+// ---------- HINT ----------
+function giveHint() {
+
+  if (hintsUsed >= 7) {
+    alert("❌ Hint limit reached!");
+    return;
+  }
+
+  for (let i = 0; i < 81; i++) {
+    if (
+      cells[i].value !== "" &&
+      !cells[i].classList.contains("fixed") &&
+      parseInt(cells[i].value) !== solution[i]
+    ) {
+      cells[i].value = solution[i];
+      cells[i].style.background = "#ff9800";
+      hintsUsed++;
+      document.getElementById("hints").innerText = hintsUsed;
+      return;
+    }
+  }
+
+  for (let i = 0; i < 81; i++) {
+    if (cells[i].value === "" && !cells[i].classList.contains("fixed")) {
+      cells[i].value = solution[i];
+      cells[i].style.background = "#4caf50";
+      hintsUsed++;
+      document.getElementById("hints").innerText = hintsUsed;
+      return;
+    }
+  }
+
+  alert("Already solved!");
+}
+
+// ---------- CHECK ----------
+function checkSolution() {
+  let correct = true;
+
+  for (let i = 0; i < 81; i++) {
+    if (parseInt(cells[i].value) === solution[i]) {
+      cells[i].style.background = "#4caf50";
+    } else {
+      cells[i].style.background = "#f44336";
+      correct = false;
+    }
+  }
+
+  if (correct) {
+    if (hintsUsed <= 7) {
+      solvedCount++;
+      localStorage.setItem("sudokuSolved", solvedCount);
+      document.getElementById("counter").innerText = solvedCount;
+      setTimeout(() => alert("🎉 Counted as solved!"), 100);
+    } else {
+      setTimeout(() => alert("Solved, but too many hints 😅"), 100);
+    }
+  }
+}
+
+// ---------- NEW GAME ----------
+function newGame() {
+  location.reload();
+}
+
+</script>
+
+</body>
+</html>

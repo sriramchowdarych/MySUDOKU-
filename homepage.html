@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sudoku Home</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div class="container">
+  <div class="logo">
+    <img src="logo.png" alt="Sudoku Logo">
+  </div>
+
+  <div class="btn" onclick="startGame()">Play</div>
+</div>
+
+<div class="music" onclick="toggleMusic()">Music: Off</div>
+
+<audio id="bgMusic" loop>
+  <source src="music.mp3" type="audio/mpeg">
+</audio>
+
+<script>
+function startGame() {
+  window.location.href = "game.html";
+}
+
+let isPlaying = false;
+const music = document.getElementById("bgMusic");
+const btn = document.querySelector(".music");
+
+// Auto start music on first click
+document.addEventListener("click", () => {
+  if (!isPlaying) {
+    music.play();
+    btn.innerText = "Music: On";
+    isPlaying = true;
+  }
+}, { once: true });
+
+function toggleMusic() {
+  if (isPlaying) {
+    music.pause();
+    btn.innerText = "Music: Off";
+  } else {
+    music.play();
+    btn.innerText = "Music: On";
+  }
+  isPlaying = !isPlaying;
+}
+</script>
+
+</body>
+</html>
